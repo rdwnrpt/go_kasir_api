@@ -6,10 +6,14 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+
+	"go_kasir_api/handlers"
+	"go_kasir_api/repositories"
+	"go_kasir_api/services"
 )
 
 /* =======================
-   MODELS
+   MODELS - PRODUK
 ======================= */
 
 type Produk struct {
@@ -19,25 +23,14 @@ type Produk struct {
 	Stok  int    `json:"stok"`
 }
 
-type Category struct {
-	ID          int    `json:"id"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
-}
-
 /* =======================
-   DATA DUMMY
+   DATA DUMMY - PRODUK
 ======================= */
 
 var produk = []Produk{
 	{ID: 1, Nama: "Indomie Godog", Harga: 3500, Stok: 10},
 	{ID: 2, Nama: "Vit 1000ml", Harga: 3000, Stok: 40},
 	{ID: 3, Nama: "Kecap", Harga: 12000, Stok: 20},
-}
-
-var categories = []Category{
-	{ID: 1, Name: "Makanan", Description: "Produk makanan"},
-	{ID: 2, Name: "Minuman", Description: "Produk minuman"},
 }
 
 /* =======================
@@ -113,99 +106,16 @@ func deleteProduk(w http.ResponseWriter, r *http.Request) {
 }
 
 /* =======================
-   CATEGORY HANDLERS
-======================= */
-
-func getCategoryByID(w http.ResponseWriter, r *http.Request) {
-	idStr := strings.TrimPrefix(r.URL.Path, "/categories/")
-	id, err := strconv.Atoi(idStr)
-	if err != nil {
-		http.Error(w, "Invalid Category ID", http.StatusBadRequest)
-		return
-	}
-
-	for _, c := range categories {
-		if c.ID == id {
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(c)
-			return
-		}
-	}
-
-	http.Error(w, "Category not found", http.StatusNotFound)
-}
-
-func createCategory(w http.ResponseWriter, r *http.Request) {
-	var newCategory Category
-	if err := json.NewDecoder(r.Body).Decode(&newCategory); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	newCategory.ID = len(categories) + 1
-	categories = append(categories, newCategory)
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(newCategory)
-}
-
-func updateCategory(w http.ResponseWriter, r *http.Request) {
-	idStr := strings.TrimPrefix(r.URL.Path, "/categories/")
-	id, err := strconv.Atoi(idStr)
-	if err != nil {
-		http.Error(w, "Invalid Category ID", http.StatusBadRequest)
-		return
-	}
-
-	var updatedCategory Category
-	if err := json.NewDecoder(r.Body).Decode(&updatedCategory); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	for i := range categories {
-		if categories[i].ID == id {
-			updatedCategory.ID = id
-			categories[i] = updatedCategory
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(updatedCategory)
-			return
-		}
-	}
-
-	http.Error(w, "Category not found", http.StatusNotFound)
-}
-
-func deleteCategory(w http.ResponseWriter, r *http.Request) {
-	idStr := strings.TrimPrefix(r.URL.Path, "/categories/")
-	id, err := strconv.Atoi(idStr)
-	if err != nil {
-		http.Error(w, "Invalid Category ID", http.StatusBadRequest)
-		return
-	}
-
-	for i, c := range categories {
-		if c.ID == id {
-			categories = append(categories[:i], categories[i+1:]...)
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]string{
-				"message": "Category berhasil dihapus",
-			})
-			return
-		}
-	}
-
-	http.Error(w, "Category not found", http.StatusNotFound)
-}
-
-/* =======================
    MAIN
 ======================= */
 
 func main() {
+	// Setup Category Layered Architecture
+	categoryRepo := repositories.NewCategoryRepository()
+	categoryService := services.NewCategoryService(categoryRepo)
+	categoryHandler := handlers.NewCategoryHandler(categoryService)
 
-	// PRODUK
+	// PRODUK (still monolithic)
 	http.HandleFunc("/api/produk/", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case "GET":
@@ -241,31 +151,9 @@ func main() {
 		}
 	})
 
-	// CATEGORY
-	http.HandleFunc("/categories/", func(w http.ResponseWriter, r *http.Request) {
-		switch r.Method {
-		case "GET":
-			getCategoryByID(w, r)
-		case "PUT":
-			updateCategory(w, r)
-		case "DELETE":
-			deleteCategory(w, r)
-		default:
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		}
-	})
-
-	http.HandleFunc("/categories", func(w http.ResponseWriter, r *http.Request) {
-		switch r.Method {
-		case "GET":
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(categories)
-		case "POST":
-			createCategory(w, r)
-		default:
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		}
-	})
+	// CATEGORY (layered architecture)
+	http.HandleFunc("/categories", categoryHandler.HandleCategories)
+	http.HandleFunc("/categories/", categoryHandler.HandleCategoryByID)
 
 	// HEALTH CHECK
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
