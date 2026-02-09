@@ -42,15 +42,7 @@ func (h *ProductHandler) HandleProductByID(w http.ResponseWriter, r *http.Reques
 	}
 }
 
-func (h *ProductHandler) getAll(w http.ResponseWriter, r *http.Request) {
-	products, err := h.service.GetAll()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(products)
-}
+
 
 func (h *ProductHandler) create(w http.ResponseWriter, r *http.Request) {
 	var p models.Product
@@ -114,4 +106,17 @@ func (h *ProductHandler) delete(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"message": "Product deleted successfully"})
+}
+
+func (h *ProductHandler) getAll(w http.ResponseWriter, r *http.Request) {
+	// Get search query parameter
+	name := r.URL.Query().Get("name")
+	
+	products, err := h.service.GetAll(name) // Pass name to service
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(products)
 }
