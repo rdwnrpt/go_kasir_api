@@ -1,6 +1,7 @@
 package services
 
 import (
+	"errors" // ✅ ADD THIS IMPORT
 	"go_kasir_api/models"
 	"go_kasir_api/repositories"
 )
@@ -14,19 +15,28 @@ func NewCategoryService(repo *repositories.CategoryRepository) *CategoryService 
 }
 
 func (s *CategoryService) GetAll() ([]models.Category, error) {
-	return s.repo.GetAll(), nil
+	return s.repo.GetAll()  
 }
 
-func (s *CategoryService) Create(data *models.Category) error {
-	return s.repo.Create(data)
+func (s *CategoryService) Create(c *models.Category) error {
+	// Validation
+	if c.Name == "" {
+		return errors.New("name is required")
+	}
+	return s.repo.Create(c)
 }
 
 func (s *CategoryService) GetByID(id int) (*models.Category, error) {
 	return s.repo.GetByID(id)
 }
 
-func (s *CategoryService) Update(category *models.Category) error {
-	return s.repo.Update(category)
+
+func (s *CategoryService) Update(c *models.Category) error {
+	// Validation
+	if c.Name == "" {
+		return errors.New("name is required")
+	}
+	return s.repo.Update(c)
 }
 
 func (s *CategoryService) Delete(id int) error {
